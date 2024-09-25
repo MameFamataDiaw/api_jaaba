@@ -15,14 +15,14 @@ return new class extends Migration
             $table->id();
             $table->string('nom',30);
             $table->string('prenom',50);
-            $table->string('username')->unique();
-            $table->string('photo')->nullable();
             $table->string('telephone');
+            $table->string('adresse');
             $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->foreignId('role_id')->constrained()->onDelete('cascade');
+            $table->string('photo')->nullable();
+            $table->enum('role', ['vendeur', 'client', 'livreur', 'admin']);
             $table->string('password');
-
+            $table->boolean('statut')->default(true);
+            $table->timestamp('email_verified_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
