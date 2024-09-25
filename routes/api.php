@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BoutiqueController;
 use App\Http\Controllers\RoleController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -27,15 +28,23 @@ Route::middleware('auth:sanctum')->group(function() {
     // Route pour modifier le profile_photo de user
     Route::post('/user/profile/photo', [AuthController::class, 'updateProfilePhoto']);
 
-    Route::apiResource('boutiques', \App\Http\Controllers\BoutiqueController::class);
+//    Route::apiResource('boutiques', \App\Http\Controllers\BoutiqueController::class);
 
+    // Route pour récupérer ou créer une boutique pour le vendeur authentifié
+    Route::get('/boutique', [BoutiqueController::class, 'getOrCreateBoutique'])->name('boutique.getOrCreate');
 
-});
-
-Route::apiResource('produits', \App\Http\Controllers\ProduitController::class)->only([
+    // Route pour mettre à jour la boutique du vendeur
+    Route::put('/boutique', [BoutiqueController::class, 'updateBoutique'])->name('boutique.update');
+//    Route::apiResource('produits', \App\Http\Controllers\ProduitController::class);
+    Route::apiResource('produits', \App\Http\Controllers\ProduitController::class)->except([
+        'index', 'show'  // Les routes index et show sont accessibles publiquement
+    ]);
+    Route::apiResource('produits', \App\Http\Controllers\ProduitController::class)->only([
     'index', 'show'  // Accès public pour la liste et les détails des burgers
 ]);// Accès public pour la liste et les détails des burgers
 
-Route::apiResource('produits', \App\Http\Controllers\ProduitController::class)->except([
-    'index', 'show'  // Les routes index et show sont accessibles publiquement
-]);
+});
+
+
+
+

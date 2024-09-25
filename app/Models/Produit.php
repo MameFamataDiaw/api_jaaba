@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Produit extends Model
 {
     use HasFactory;
-    protected $fillable = ['libelle', 'description', 'prix', 'quantite','photo','categorie_id', 'user_id'];
+    protected $fillable = ['libelle', 'description', 'prix', 'quantite','photo','categorie_id', 'user_id', 'boutique_id'];
 
     /**
      * Relation avec Categorie
@@ -19,11 +19,19 @@ class Produit extends Model
     }
 
     /**
-     * Relation avec Boutique
+     * Relation avec User
      */
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Relation avec Boutique
+     */
+    public function boutique()
+    {
+        return $this->belongsTo(Boutique::class);
     }
 
     public function commandes(){

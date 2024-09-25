@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('boutiques', function (Blueprint $table) {
             $table->id();
-            $table->string('nomBoutique',50)->unique();
+            $table->string('nomBoutique',50)->nullable()->unique();
             $table->text('description')->nullable();
             $table->string('logo')->nullable();
-            $table->string('adresse');
-            $table->string('telephone');
+            $table->string('adresse')->nullable();
+            $table->string('telephone')->nullable();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });

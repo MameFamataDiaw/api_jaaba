@@ -33,8 +33,19 @@ class ProduitController extends Controller
      */
     public function store(Request $request)
     {
-        $user = Auth::user();
         try {
+            $user = Auth::user();
+
+            $boutique = $user->boutique;
+
+            // Vérifier que la boutique existe pour l'utilisateur connecté
+            if (!$boutique) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Vous devez d'abord créer une boutique avant d'ajouter des produits."
+                ], 403);
+            }
+
             $request->validate(
                 [
                     'libelle' => 'required|max:20',
@@ -42,17 +53,15 @@ class ProduitController extends Controller
                     'prix' => 'required|numeric',
                     'quantite'=> 'required|numeric',
                     'photo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-                ]
+                    'categorie_id' => 'required|exists:categories,id'
+                    ]
             );
+
+            // Gestion de l'upload de l'image
             $imageName = time().'.'.$request->photo->extension();
             $request->photo->move(public_path('images'), $imageName);
 
-//        $product = new Produit();
-//        $product->libelle = $request->libelle;
-//        $product->description = $request->description;
-//        $product->photo = 'images/'.$imageName;
-//        $product->save();
-
+            // Création du produit et association avec la boutique du vendeur
             $produit = Produit::create([
                 'libelle' => $request->libelle,
                 'description' => $request->description,
@@ -60,12 +69,13 @@ class ProduitController extends Controller
                 'quantite' => $request->quantite,
                 'photo' => $imageName,
                 'categorie_id' => $request->categorie_id,
+                'boutique_id' => $boutique->id,
                 'user_id' => $user->id,
             ]);
 
             return response()->json([
                 'status' => true,
-                'message' => "Produit cree avec succes !",
+                'message' => "Un nouveau produit est ajoute a la boutique !",
                 'produit' => $produit
             ],201);
         }catch (\Exception $e){
