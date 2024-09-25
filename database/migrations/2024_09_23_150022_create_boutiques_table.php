@@ -13,10 +13,12 @@ return new class extends Migration
     {
         Schema::create('boutiques', function (Blueprint $table) {
             $table->id();
-            $table->string('nomBoutique',50);
-            $table->string('logo');
+            $table->string('nomBoutique',50)->unique();
+            $table->text('description')->nullable();
+            $table->string('logo')->nullable();
             $table->string('adresse');
-            $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->string('telephone');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });
     }

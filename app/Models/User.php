@@ -18,9 +18,13 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
+        'nom',
+        'prenom',
+        'telephone',
+//        'name',
         'email',
         'password',
+        'role_id',
     ];
 
     /**
@@ -32,6 +36,30 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    /**
+     * Relation avec le modele Role
+     */
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Relation avec le modele Client
+     */
+    public function client()
+    {
+        return $this->hasOne(Client::class);
+    }
+
+    /**
+     * Relation avec le modele Boutique
+     */
+    public function boutique()
+    {
+        return $this->hasOne(Boutique::class);
+    }
 
     /**
      * The attributes that should be cast.

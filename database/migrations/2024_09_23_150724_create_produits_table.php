@@ -14,11 +14,12 @@ return new class extends Migration
         Schema::create('produits', function (Blueprint $table) {
             $table->id();
             $table->string('libelle',30);
-            $table->string('description',100);
+            $table->text('description');
             $table->integer('prix');
             $table->integer('quantite');
             $table->string('photo')->nullable();
-            $table->foreignId('categorie_id')->references('id')->on('categories');
+            $table->foreignId('categorie_id')->constrained()->restrictOnDelete();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });
     }
