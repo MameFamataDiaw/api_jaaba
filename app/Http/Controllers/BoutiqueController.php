@@ -17,6 +17,13 @@ class BoutiqueController extends Controller
         $user = Auth::user();
         $boutique = $user->boutique;
 
+        if (!$boutique) {
+            return response()->json([
+                'status' => false,
+                'message' => "L'utilisateur n'a pas encore de boutique."
+            ], 404);
+        }
+
         return response()->json([
             'status' => true,
             'boutique' => $boutique

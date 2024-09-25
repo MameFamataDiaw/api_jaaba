@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Route pour authentifier un utilisateur
-Route::post('/login', [AuthController::class,'store'])->name('auth.store');
+//Route::post('/login', [AuthController::class,'store'])->name('auth.store');
 Route::post('/userlogin', [AuthController::class,'login'])->name('auth.store');
 
 // Route pour enregistrer un nouvel utilisateur
@@ -27,10 +27,15 @@ Route::middleware('auth:sanctum')->group(function() {
     // Route pour modifier le profile_photo de user
     Route::post('/user/profile/photo', [AuthController::class, 'updateProfilePhoto']);
 
-
+    Route::apiResource('boutiques', \App\Http\Controllers\BoutiqueController::class);
 
 
 });
 
-Route::apiResource('produits', \App\Http\Controllers\ProduitController::class);
-Route::apiResource('boutiques', \App\Http\Controllers\BoutiqueController::class);
+Route::apiResource('produits', \App\Http\Controllers\ProduitController::class)->only([
+    'index', 'show'  // Accès public pour la liste et les détails des burgers
+]);// Accès public pour la liste et les détails des burgers
+
+Route::apiResource('produits', \App\Http\Controllers\ProduitController::class)->except([
+    'index', 'show'  // Les routes index et show sont accessibles publiquement
+]);

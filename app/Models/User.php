@@ -39,6 +39,17 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function boutique()
+    {
+        return $this->hasOne(Boutique::class); // Si la relation est one-to-one
+        // return $this->hasMany(Boutique::class); // Si un utilisateur peut avoir plusieurs boutiques
+    }
+
+    public function produits()
+    {
+        return $this->hasMany(Produit::class);
+    }
+
     /**
      * The attributes that should be cast.
      *

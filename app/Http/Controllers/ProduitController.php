@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Produit;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ProduitController extends Controller
 {
@@ -13,10 +14,17 @@ class ProduitController extends Controller
      */
     public function index()
     {
-        $product = Produit::all();
+        $produits = Produit::all();
+        if (!$produits) {
+            return response()->json([
+                'status' => false,
+                'message' => "L'utilisateur n'a pas encore de produits."
+            ], 404);
+        }
+
         return response()->json([
             'status' => true,
-            'burgers' => $product
+            'produits' => $produits
         ],200);
     }
 
@@ -25,6 +33,7 @@ class ProduitController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
         try {
             $request->validate(
                 [
@@ -51,6 +60,7 @@ class ProduitController extends Controller
                 'quantite' => $request->quantite,
                 'photo' => $imageName,
                 'categorie_id' => $request->categorie_id,
+                'user_id' => $user->id,
             ]);
 
             return response()->json([
@@ -82,6 +92,8 @@ class ProduitController extends Controller
     public function update(Request $request, string $id)
     {
         try {
+            $user = Auth::user();  // Récupérer l'utilisateur connecte
+//            $product = $user->produits()->findOrFail($id);  // Vérifier si le produit appartient bien au vendeur
             // Récupérer le produit à mettre à jour
             $product = Produit::findOrFail($id);
 
@@ -107,15 +119,23 @@ class ProduitController extends Controller
                 $product->photo = $imageName; // Assigner la nouvelle image
             }
 
-            // Mettre à jour les autres attributs du produit
-            $product->libelle = $request->libelle;
-            $product->description = $request->description;
-            $product->prix = $request->prix;
-            $product->quantite = $request->quantite;
-            $product->categorie_id = $request->categorie_id;
+//            // Mettre à jour les autres attributs du produit
+//            $product->libelle = $request->libelle;
+//            $product->description = $request->description;
+//            $product->prix = $request->prix;
+//            $product->quantite = $request->quantite;
+//            $product->categorie_id = $request->categorie_id;
+//
+//            // Sauvegarder les changements dans la base de données
+//            $product->save();
 
-            // Sauvegarder les changements dans la base de données
-            $product->save();
+            $product->update([
+                'libelle' => $request->libelle,
+                'description' => $request->description,
+                'prix' => $request->prix,
+                'quantite' => $request->quantite,
+                'categorie_id' => $request->categorie_id,
+            ]);
 
             return response()->json([
                 'status' => true,
@@ -140,13 +160,19 @@ class ProduitController extends Controller
     public function destroy(string $id)
     {
         try {
-            $product = Produit::findOrFail($id);
+//            $product = Produit::findOrFail($id);
+            $user = Auth::user();  // Récupérer l'utilisateur connecté
+            $product = $user->produits()->findOrFail($id);  // Vérifier si le produit appartient bien au vendeur
+
+            if ($product->photo && file_exists(public_path('images/' . $product->photo))) {
+                unlink(public_path('images/' . $product->photo));
+            }
+
             $product->delete();
 //            return response()->json(null,204);
                 return response()->json([
                     'status' => true,
                     'message' => "produit supprime !",
-                    'produit' => $product
                 ],204);
         }catch(ModelNotFoundException $ex){
             return response()->json(['error' => 'Produit non trouve'], 404);
