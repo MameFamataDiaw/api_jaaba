@@ -96,7 +96,6 @@ class ProduitController extends Controller
 //            $product = $user->produits()->findOrFail($id);  // Vérifier si le produit appartient bien au vendeur
             // Récupérer le produit à mettre à jour
             $product = Produit::findOrFail($id);
-
             // Validation des données (photo n'est pas obligatoire)
             $request->validate([
                 'libelle' => 'required|max:20',
