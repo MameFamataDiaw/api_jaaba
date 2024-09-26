@@ -9,18 +9,18 @@ class Commande extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['montant', 'date', 'statut', 'client_id',];
+    protected $fillable = ['montant', 'date', 'statut', 'user_id', 'reference'];
 
     /**
      * Relation avec Client
      */
-    public function client()
-    {
-        return $this->belongsTo(Client::class);
-    }
+    public function customer()
+{
+    return $this->belongsTo(User::class, 'user_id');
+}
 
     public function produits(){
-        return $this->belongsToMany(Produit::class, 'details_commandes')->withPivot('quantite','prix')->withTimestamps();
+        return $this->belongsToMany(Produit::class, 'details_commandes')->withPivot('quantiteProduit','prixProduit')->withTimestamps();
     }
 
     /**

@@ -29,6 +29,12 @@ class User extends Authenticatable
         'statut',
     ];
 
+    public function customer()
+{
+    return $this->belongsTo(User::class, 'user_id');
+}
+
+
     /**
      * The attributes that should be hidden for serialization.
      *
