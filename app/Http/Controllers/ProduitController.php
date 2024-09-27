@@ -15,17 +15,57 @@ class ProduitController extends Controller
     public function index()
     {
         $produits = Produit::all();
-        if (!$produits) {
-            return response()->json([
-                'status' => false,
-                'message' => "L'utilisateur n'a pas encore de produits."
-            ], 404);
-        }
 
         return response()->json([
             'status' => true,
             'produits' => $produits
         ],200);
+    }
+
+    /**
+     * Display a listing of the resource.
+     */
+    public function getProduitsBoutique()
+    {
+        try {
+            //recuperer l'utilisateur authentifie
+            $user = Auth::user();
+
+            //Recuperer la boutique de cet utilisateur
+            $boutique = $user->boutique;
+
+            //verifier si la boutique existe
+            if (!$boutique){
+                return response()->json([
+                    'status' => false,
+                    'message' => "Vous n'avez pas encore de boutique associée."
+                ], 404);
+            }
+
+            //Recuperer tous les produits de cette boutique
+            $produits = $boutique->produits;
+
+            if ($produits->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Votre boutique ne contient pas encore de produits."
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => "Liste des produits de la boutique.",
+                'produits' => $produits
+            ], 200);
+
+        }catch(\Exception $e){
+            \Log::error('Erreur lors de la récupération des produits de la boutique : '.$e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => "Erreur lors de la récupération des produits de la boutique.",
+                'error' => $e->getMessage()
+                ], 500);
+        }
     }
 
     /**
@@ -35,6 +75,14 @@ class ProduitController extends Controller
     {
         try {
             $user = Auth::user();
+
+            // Vérifier si l'utilisateur a le rôle "vendeur"
+            if (!$user->hasRole('vendeur')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Seuls les vendeurs peuvent ajouter un produit."
+                ], 403);
+            }
 
             $boutique = $user->boutique;
 
@@ -93,7 +141,22 @@ class ProduitController extends Controller
      */
     public function show(string $id)
     {
-        //
+        try {
+            // Récupérer la boutique par ID
+            $produit = Produit::findOrFail($id);
+
+            return response()->json([
+                'status' => true,
+                'produit' => $produit
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => "Produit non trouvé.",
+                'error' => $e->getMessage()
+            ], 404);
+        }
     }
 
     /**
@@ -102,11 +165,27 @@ class ProduitController extends Controller
     public function update(Request $request, string $id)
     {
         try {
-            $user = Auth::user();  // Récupérer l'utilisateur connecte
-//            $product = $user->produits()->findOrFail($id);  // Vérifier si le produit appartient bien au vendeur
-            // Récupérer le produit à mettre à jour
-            $product = Produit::findOrFail($id);
-            // Validation des données (photo n'est pas obligatoire)
+            // Récupérer l'utilisateur connecte
+            $user = Auth::user();
+            // Vérifier si l'utilisateur a le rôle "vendeur"
+            if (!$user->hasRole('vendeur')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Seuls les vendeurs peuvent créer une boutique."
+                ], 403);
+            }
+
+//            $product = $user->produits()->findOrFail($id);Vérifier si le produit appartient bien au vendeur
+
+            //Recuperer la boutique du vendeur connecte
+            $boutique = $user->boutique;
+
+            //Recuperer le produit et verifier qu'il appartient a la boutique du vendeur
+            $product = Produit::where('id', $id)
+                ->where('boutique_id', $boutique->id)
+                ->firstOrFail();
+
+            // Validation des données
             $request->validate([
                 'libelle' => 'required|max:20',
                 'description' => 'required|max:100',
@@ -128,16 +207,7 @@ class ProduitController extends Controller
                 $product->photo = $imageName; // Assigner la nouvelle image
             }
 
-//            // Mettre à jour les autres attributs du produit
-//            $product->libelle = $request->libelle;
-//            $product->description = $request->description;
-//            $product->prix = $request->prix;
-//            $product->quantite = $request->quantite;
-//            $product->categorie_id = $request->categorie_id;
-//
-//            // Sauvegarder les changements dans la base de données
-//            $product->save();
-
+//            Mise a jour des autres champs
             $product->update([
                 'libelle' => $request->libelle,
                 'description' => $request->description,
@@ -169,20 +239,38 @@ class ProduitController extends Controller
     public function destroy(string $id)
     {
         try {
-//            $product = Produit::findOrFail($id);
-            $user = Auth::user();  // Récupérer l'utilisateur connecté
-            $product = $user->produits()->findOrFail($id);  // Vérifier si le produit appartient bien au vendeur
+//            Recuperer l'utilisateur connecte
+            $user = Auth::user();
+            // Vérifier si l'utilisateur a le rôle "vendeur"
+            if (!$user->hasRole('vendeur')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Seuls les vendeurs peuvent créer une boutique."
+                ], 403);
+            }
+//            $product = $user->produits()->findOrFail($id);  // Vérifier si le produit appartient bien au vendeur
 
+//            Recuperer la boutique du vendeur
+            $boutique = $user->boutique;
+
+//            Recuperer le produit et verifier qu'il appartient a la boutique
+            $product = Produit::where('id', $id)
+                ->where('boutique_id', $boutique->id)
+                ->firstOrFail();
+
+//            Supprimer l'image associee au produit si elle existe
             if ($product->photo && file_exists(public_path('images/' . $product->photo))) {
                 unlink(public_path('images/' . $product->photo));
             }
 
+//            Supprimer le produit
             $product->delete();
-//            return response()->json(null,204);
-                return response()->json([
-                    'status' => true,
-                    'message' => "produit supprime !",
-                ],204);
+
+            return response()->json([
+                'status' => true,
+                'message' => "produit supprime !",
+            ],204);
+
         }catch(ModelNotFoundException $ex){
             return response()->json(['error' => 'Produit non trouve'], 404);
         }

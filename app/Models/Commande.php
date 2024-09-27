@@ -9,14 +9,14 @@ class Commande extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['montant', 'date', 'statut', 'client_id',];
+    protected $fillable = ['montant', 'date', 'statut', 'user_id',];
 
     /**
      * Relation avec Client
      */
-    public function client()
+    public function user()
     {
-        return $this->belongsTo(Client::class);
+        return $this->belongsTo(User::class);
     }
 
     public function produits(){

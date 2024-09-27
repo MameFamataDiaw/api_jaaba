@@ -13,21 +13,31 @@ class BoutiqueController extends Controller
      */
     public function index()
     {
+        try {
+//            Récupérer toutes les boutiques
+//            $boutiques = Boutique::all();
+            $user = Auth::user();
 
-//        $user = Auth::user();
-//        $boutique = $user->boutique;
-//
-//        if (!$boutique) {
-//            return response()->json([
-//                'status' => false,
-//                'message' => "L'utilisateur n'a pas encore de boutique."
-//            ], 404);
-//        }
-//
-//        return response()->json([
-//            'status' => true,
-//            'boutique' => $boutique
-//        ],200);
+            if ($user->role !== 'admin'){
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $boutiques = Boutique::with('user')->get();
+
+            return response()->json([
+                'status' => true,
+                'boutiques' => $boutiques
+            ], 200);
+
+        }catch (\Exception $e){
+            \Log::error('Erreur lors de la récupération des boutiques : ' . $e->getMessage());
+
+            return response()->json([
+                'status' => false,
+                'message' => "Erreur lors de la récupération des boutiques.",
+                'error' => $e->getMessage()
+            ], 400);
+        }
     }
 
     /**
@@ -81,7 +91,30 @@ class BoutiqueController extends Controller
      */
     public function show(string $id)
     {
-        //
+        try {
+            $user = Auth::user(); // Récupérer l'utilisateur connecté
+
+            // Vérifier si l'utilisateur est un administrateur
+            if ($user->role !== 'admin') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            // Récupérer une boutique par son ID
+            $boutique = Boutique::with('user')->findOrFail($id);
+
+            return response()->json([
+                'status' => true,
+                'boutique' => $boutique
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de la récupération des détails de la boutique : ' . $e->getMessage());
+
+            return response()->json([
+                'status' => false,
+                'message' => "Erreur lors de la récupération des détails de la boutique.",
+                'error' => $e->getMessage()
+            ], 400);
+        }
     }
 
     /**
@@ -191,17 +224,20 @@ class BoutiqueController extends Controller
         //recuperer l'utilisateur authentifie
         $user = Auth::user();
 
+        // Vérifier si l'utilisateur a le rôle "vendeur"
+        if (!$user->hasRole('vendeur')) {
+            return response()->json([
+                'status' => false,
+                'message' => "Seuls les vendeurs peuvent créer une boutique."
+            ], 403);
+        }
+
         //verifier si le vendeur a deja une boutique associee
         $boutique = $user->boutique;
 
         if (!$boutique) {
             // Créer une nouvelle boutique si elle n'existe pas
             $boutique = Boutique::create([
-//                'nomBoutique' => 'Nouvelle Boutique',
-//                'description' => 'Description par défaut',
-//                'logo' => null,
-//                'adresse' => 'Adresse par défaut',
-//                'telephone' => '0000000000',
                 'user_id' => $user->id
             ]);
         }
@@ -217,6 +253,14 @@ class BoutiqueController extends Controller
         try {
             // Récupérer l'utilisateur authentifié
             $user = Auth::user();
+
+            // Vérifier si l'utilisateur a le rôle "vendeur"
+            if (!$user->hasRole('vendeur')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Seuls les vendeurs peuvent créer une boutique."
+                ], 403);
+            }
 
             // Récupérer la boutique du vendeur
             $boutique = $user->boutique;
@@ -271,5 +315,57 @@ class BoutiqueController extends Controller
             ], 400);
         }
     }
+
+    public function destroyBoutique(string $id)
+    {
+        try {
+            // Récupérer l'utilisateur authentifié
+            $user = Auth::user();
+
+            // Vérifier si l'utilisateur a le rôle "vendeur"
+            if (!$user->hasRole('vendeur')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Seuls les vendeurs peuvent supprimer leur boutique."
+                ], 403);
+            }
+
+            // Récupérer la boutique
+            $boutique = Boutique::findOrFail($id);
+
+            // Vérifier que la boutique appartient à l'utilisateur connecté
+            if ($boutique->user_id !== $user->id) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Vous n'êtes pas autorisé à supprimer cette boutique."
+                ], 403);
+            }
+
+            // Supprimer l'image du logo s'il existe
+            if ($boutique->logo && file_exists(public_path('images/boutiques/' . $boutique->logo))) {
+                unlink(public_path('images/boutiques/' . $boutique->logo));
+            }
+
+            // Supprimer les produits associés à la boutique
+            $boutique->produits()->delete();  // Assurez-vous d'avoir une relation dans le modèle Boutique
+
+            // Supprimer la boutique
+            $boutique->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => "Boutique supprimée avec succès !"
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de la suppression de la boutique : ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => "Erreur lors de la suppression de la boutique.",
+                'error' => $e->getMessage()
+            ], 400);
+        }
+    }
+
 
 }
