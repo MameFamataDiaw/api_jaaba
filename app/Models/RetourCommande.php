@@ -10,14 +10,13 @@ class RetourCommande extends Model
     use HasFactory;
 
     protected $fillable = [
-        'commande_id', 'produit_id', 'quantite_retournee', 'statut', 'motif'
+        'commande_id', 'produit_id', 'motif', 'quantitéRetournée', 'statut'
     ];
 
     public function commande()
     {
         return $this->belongsTo(Commande::class);
     }
-
     public function produit()
     {
         return $this->belongsTo(Produit::class);

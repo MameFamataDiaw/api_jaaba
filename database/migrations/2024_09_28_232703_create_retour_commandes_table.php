@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('retours_commande', function (Blueprint $table) {
+        Schema::create('retour_commandes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('commande_id')->constrained()->onDelete('cascade');
             $table->foreignId('produit_id')->constrained()->onDelete('cascade');
-            $table->string('motif')->nullable();
-            $table->integer('quantiteRetournee');
-            $table->enum('statut', ['en attente', 'accepte', 'rejete'])->default('en attente');
+            $table->string('motif');
+            $table->integer('quantitéRetournée');
+            $table->enum('statut', ['en attente', 'acceptée', 'refusée'])->default('en attente');
             $table->timestamps();
         });
     }
@@ -27,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('retours_commande');
+        Schema::dropIfExists('retour_commandes');
     }
 };

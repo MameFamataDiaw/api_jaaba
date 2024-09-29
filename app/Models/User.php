@@ -42,12 +42,15 @@ class User extends Authenticatable
     public function boutique()
     {
         return $this->hasOne(Boutique::class); // Si la relation est one-to-one
-        // return $this->hasMany(Boutique::class); // Si un utilisateur peut avoir plusieurs boutiques
     }
 
     public function produits()
     {
         return $this->hasMany(Produit::class);
+    }
+    public function commandes()
+    {
+        return $this->hasMany(Commande::class);
     }
 
     /**

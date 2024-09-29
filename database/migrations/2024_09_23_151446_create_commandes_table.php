@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             $table->integer('montant');
             $table->timestamp('date')->default(DB::raw('CURRENT_TIMESTAMP'));
-            $table->enum('statut',['en cours','termine','annule'])->default('en cours');
+            $table->enum('statut',['en cours','terminée','annulée','livrée'])->default('en cours');
             $table->foreignId('user_id')->references('id')->on('users');
             $table->timestamps();
         });

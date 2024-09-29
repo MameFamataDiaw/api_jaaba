@@ -35,7 +35,7 @@ class Produit extends Model
     }
 
     public function commandes(){
-        return $this->belongsToMany(Commande::class, 'details_commandes')->withPivot('quantite','prix')->withTimestamps();
+        return $this->belongsToMany(Commande::class, 'details_commandes')->withPivot('quantiteProduit','prixProduit')->withTimestamps();
     }
 
     /**
@@ -44,5 +44,10 @@ class Produit extends Model
     public function detailsCommandes()
     {
         return $this->hasMany(DetailsCommande::class);
+    }
+
+    public function retours()
+    {
+        return $this->hasMany(RetourCommande::class);
     }
 }
