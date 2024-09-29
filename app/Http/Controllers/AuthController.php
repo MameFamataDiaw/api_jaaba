@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Adresse;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,14 +21,16 @@ class AuthController extends Controller
         try {
             // Valider les données d'entrée
             $data = $request->validate([
-                'nom' => 'required|string|max:30',
-                'prenom' => 'required|string|max:50',
+                'nom' => 'required|string',
+                'prenom' => 'required|string',
                 'telephone' => 'required|string',
-                'adresse' => 'required|string',
                 'email' => 'required|email|unique:users,email',
-                'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'password' => 'required|string|min:6',
+                'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'password' => 'required|string',
                 'role' => 'required|in:vendeur,client,livreur,admin',
+                'pays' => 'required|string',
+                'ville' => 'required|string',
+                'codePostal' => 'required|string',
             ]);
 
             // Vérification et enregistrement de la photo
@@ -35,19 +38,28 @@ class AuthController extends Controller
                 $photoName = time() . '.' . $request->photo->extension();
                 $photoPath = $request->file('photo')->storeAs('photos', $photoName, 'public');
                 $data['photo'] = $photoPath;
+            } else {
+                $data['photo'] = null;
             }
+
+            // Créer l'adresse
+            $adresse = Adresse::create([
+                'pays' => $request->pays,
+                'ville' => $request->ville,
+                'codePostal' => $request->codePostal,
+            ]);
 
             // Créer un nouvel utilisateur
             $user = new User();
             $user->nom = $data['nom'];
             $user->prenom = $data['prenom'];
             $user->telephone = $data['telephone'];
-            $user->adresse = $data['adresse'];
             $user->email = $data['email'];
             $user->password = Hash::make($data['password']);
             $user->photo = $data['photo'];
             $user->role = $data['role'];
             $user->statut = true;
+            $user->adresse_id = $adresse->id; // Associer l'adresse à l'utilisateur
 
             $user->save();
 
@@ -60,6 +72,12 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                     'statut' => $user->statut,
+                    'adresse_id' => $user->adresse_id,
+                    'adresse' => [
+                        'pays' => $adresse->pays,
+                        'ville' => $adresse->ville,
+                        'codePostal' => $adresse->codePostal,
+                    ],
                 ]
             ], 201);
 
@@ -94,6 +112,7 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Login successful',
                 'user' => $user,
+                'adresse'=>$user->adresse,
                 'token' => $token,
             ], 200);
         } catch (\Exception $e) {
@@ -114,7 +133,7 @@ class AuthController extends Controller
     public function show($id)
     {
         try {
-            $user = User::find($id);
+            $user = User::with('adresse')->find($id);
 
             return response()->json([
                 'status' => 200,
@@ -124,6 +143,7 @@ class AuthController extends Controller
                     'prenom' => $user->prenom,
                     'telephone' => $user->telephone,
                     'email' => $user->email,
+                    'adresse_id' => $user->adresse_id
                 ],
             ]);
         } catch (\Exception $e) {
@@ -154,86 +174,99 @@ class AuthController extends Controller
         }
     }
 
-    public function updateProfilePhoto(Request $request)
+    public function updateProfile(Request $request)
     {
-        $request->validate([
-            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        // Valider uniquement les champs présents dans la requête
+        $validatedData = $request->validate([
+            'nom' => 'nullable|string|max:30',
+            'prenom' => 'nullable|string|max:50',
+            'telephone' => 'nullable|string',
+            'adresse' => 'nullable|string',
+            'email' => 'nullable|email|unique:users,email,' . auth()->id(),
+            'photo' => 'nullable|string',
         ]);
 
-        $user = $request->user();
-        if ($request->hasFile('photo')) {
-            // Supprimer l'ancienne photo si elle existe
-            if ($user->photo) {
-                Storage::delete($user->photo);
+        try {
+            // Récupérer l'utilisateur connecté
+            $user = auth()->user();
+
+            // Mettre à jour uniquement les champs fournis
+            if ($request->filled('nom')) {
+                $user->nom = $request->nom;
             }
 
-            $photoName = time() . '.' . $request->photo->extension();
-            $photoPath = $request->file('photo')->storeAs('photos', $photoName, 'public');
-            $user['photo'] = $photoPath;
+            if ($request->filled('prenom')) {
+                $user->prenom = $request->prenom;
+            }
 
-            // Mettre à jour l'utilisateur avec le chemin de la nouvelle photo
-            $user->photo = $photoPath;
+            if ($request->filled('telephone')) {
+                $user->telephone = $request->telephone;
+            }
+
+            if ($request->filled('adresse')) {
+                $user->adresse = $request->adresse;
+            }
+
+            if ($request->filled('email')) {
+                $user->email = $request->email;
+            }
+
+            if ($request->hasFile('photo')) {
+                $imageName = time() . '.' . $request->photo->extension();
+                $request->photo->move(public_path('images/profiles'), $imageName);
+                $dataToUpdate['photo'] = $imageName;
+            }
+
+
+            // Sauvegarder les modifications
             $user->save();
-        }
 
-        return response()->json(['message' => 'Profile photo updated successfully.', 'profile_photo' => $photoPath]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Profil mis à jour avec succès',
+                'user' => $user
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
-//    public function store(LoginRequest $request)
-//    {
-//        try {
-//            $credentials = $request->validated();
-//
-//            if (Auth::attempt($credentials)) {
-//                $user = Auth::user();
-//
-//                // Create an API token for the user
-//                $token = $user->createToken('token-name', ['*'])->plainTextToken;
-//
-//                // Return JSON response
-//                return response()->json([
-//                    'message' => 'You are logged in.',
-//                    'user' => $user,
-//                    'token' => $token,
-//                    'tokenExpiry' => now()->addMinutes(60)->format('Y-m-d H:i:s'),
-//                ]);
-//            }
-//
-//            // Authentication failed
-//            return response()->json([
-//                'message' => 'Credentials do not match our records.',
-//            ], 401);
-//        } catch (\Exception $e) {
-//            // Handle exceptions here
-//            return response()->json([
-//                'message' => 'Error during login: ' . $e->getMessage(),
-//            ], 500);
-//        }
-//    }
-//
-//    public function changePassword(Request $request)
-//    {
-//        $validator = Validator::make($request->all(), [
-//            'current_password' => 'required',
-//            'password' => ['required', 'confirmed', Password::defaults()],
-//        ]);
-//
-//        if ($validator->fails()) {
-//            return response()->json(['errors' => $validator->errors()], 422);
-//        }
-//
-//        $user = Auth::user();
-//
-//        if (!Hash::check($request->current_password, $user->password)) {
-//            return response()->json(['message' => 'Le mot de passe actuel est incorrect'], 401);
-//        }
-//
-//        $user->update([
-//            'password' => Hash::make($request->password),
-//        ]);
-//
-//        return response()->json(['message' => 'Mot de passe changé avec succès']);
-//    }
+    public function getUseAdressById($id)
+    {
+        try {
+
+            $user = User::find($id);
+
+            if (!$user->adresse) {
+                return response()->json([
+                    'message' => 'L\'utilisateur n\'a pas d\'adresse associée.'
+                ], 404);
+            }
+
+            return response()->json([
+                'message' => 'Adresse récupérée avec succès.',
+                'user_id'=>$user->id,
+                'adresse' => [
+                    'pays' => $user->adresse->pays,
+                    'ville' => $user->adresse->ville,
+                    'codePostal' => $user->adresse->codePostal,
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erreur lors de la récupération de l\'adresse.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
+
 
 
 }

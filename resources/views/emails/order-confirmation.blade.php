@@ -53,7 +53,8 @@
     <p>Details Commande:</p>
     <ul>
         <li> Montant Total: {{ number_format($order->montant, 0, ',', ' ') }} FCFA</li>
-        <li>Date Commande: {{ $order->created_at->format('m/d/Y') }}</li>
+        <li>Date Commande: {{ $order->created_at->format('m/d/Y H:i:s') }}</li>
+
     </ul>
     <p>Pour suivre votre commande, visitez notre site, cliquez sur « Suivre la commande », saisissez votre référence de commande et cliquez sur « Suivre ».</p>
     <p>Nous vous informerons dès que votre commande sera expédiée.</p>

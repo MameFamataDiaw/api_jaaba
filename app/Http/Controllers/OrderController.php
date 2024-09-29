@@ -6,6 +6,7 @@ use App\Mail\OrderComplete;
 use App\Models\Produit;
 use Illuminate\Http\Request;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OrderConfirmation;
 use App\Models\Commande;
@@ -13,77 +14,85 @@ use App\Models\User;
 
 class OrderController extends Controller
 {
+
     public function store(Request $request)
-{
-    // Valider les données de la requête pour la création d'une commande
-    $request->validate([
-        'nom' => 'required|string',
-        'prenom' => 'required|string',
-        'email' => 'required|email',
-        'password'=>'required|string',
-        'adresse' => 'required|string',
-        'telephone' => 'required|string',
-        'montant' => 'required|integer',
-        'Produits' => 'required|array',
-        'Produits.*.id' => 'required|integer|exists:produits,id',
-        'Produits.*.quantiteProduit' => 'required|integer|min:1',
-        'Produits.*.prixProduit' => 'required|integer',
-    ]);
+    {
+        // Valider les données de la requête pour la création d'une commande
+        $request->validate([
+            'nom' => 'required|string',
+            'prenom' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'telephone' => 'required|string',
+            'Produits' => 'required|array',
+            'Produits.*.id' => 'required|integer|exists:produits,id',
+            'Produits.*.quantiteProduit' => 'required|integer|min:1',
 
 
-    // Vérifier la disponibilité des produits en stock avant de créer la commande
-    foreach ($request->Produits as $Produit) {
-        $ProduitInStock = Produit::find($Produit['id']);
-        if (!$ProduitInStock || $ProduitInStock->quantite < $Produit['quantiteProduit']) {
-            return response()->json(['success' => false, 'message' => 'Produit ' . $Produit['id'] . ' is out of stock.']);
-        }
-    }
-
-    // Utiliser updateOrCreate pour créer ou mettre à jour les informations du client
-    $customer = User::updateOrCreate(
-        ['email' => $request->email],
-        [
-            'nom' => $request->nom,
-            'prenom' => $request->prenom,
-            'adresse' => $request->adresse,
-            'email' => $request->email,
-            'password' => $request->password,
-            'telephone' => $request->telephone,
-
-        ]
-    );
-
-    //dd($customer);
-
-    // Créer une nouvelle commande sans encore attribuer de référence
-    $Commande = new Commande([
-        'user_id' => $customer->id,
-        'montant' => $request->montant,
-        'statut' => 'en cours',
-        'reference' => 'ORD-' . uniqid(),
-    ]);
-
-    $Commande->save();
-
-    // Ajouter les produits à la commande et mettre à jour le stock
-    foreach ($request->Produits as $Produit) {
-        $Commande->Produits()->attach($Produit['id'], [
-            'quantiteProduit' => $Produit['quantiteProduit'],
-            'prixProduit' => $Produit['prixProduit']
         ]);
+
+        // Vérifier la disponibilité des produits en stock avant de créer la commande
+        $montantTotal = 0;
+        foreach ($request->Produits as $Produit) {
+            $ProduitInStock = Produit::find($Produit['id']);
+
+            // Vérifier si le produit existe et si la quantité est suffisante
+            if (!$ProduitInStock || $ProduitInStock->quantite < $Produit['quantiteProduit']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le produit ' . $ProduitInStock->libelle . ' est en rupture de stock ou la quantité demandée est trop élevée.'
+                ], 400);
+            }
+
+            $montantTotal += $ProduitInStock->prix * $Produit['quantiteProduit'];
+
+        }
+        // Créer ou mettre à jour les informations du client
+        $customer = User::updateOrCreate(
+            ['email' => $request->email],
+            [
+                'nom' => $request->nom,
+                'prenom' => $request->prenom,
+                'adresse' => $request->adresse,
+                'password' => bcrypt($request->password),
+                'telephone' => $request->telephone,
+            ]
+        );
+
+        // Créer une nouvelle commande avec le montant calculé
+        $Commande = new Commande([
+            'user_id' => $customer->id,
+            'montant' => $montantTotal,
+            'statut' => 'en cours',
+            'reference' => 'ORD-' . uniqid(),
+        ]);
+
+        $Commande->save();
+
+        // Ajouter les produits à la commande et mettre à jour le stock
+        foreach ($request->Produits as $Produit) {
+            $ProduitInStock = Produit::find($Produit['id']);
+            $Commande->Produits()->attach($Produit['id'], [
+                'quantiteProduit' => $Produit['quantiteProduit'],
+                'prixProduit' => $ProduitInStock->prix,
+            ]);
+
+        }
+
+        Mail::to($customer->email)->send(new OrderConfirmation($Commande));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Commande créée avec succès.',
+            'Commande' => $Commande
+        ], 201);
     }
 
-    Mail::to($customer->email)->send(new OrderConfirmation($Commande));
 
-    return response()->json(['success' => true, 'message' => 'Commande creee avec succes.', 'Commande' => $Commande], 201);
-}
-
-
-public function index()
+    public function index()
     {
         try {
             // Récupérer les commandes avec les informations clients et produits paginées
-//            $orders = Order::with('customer', 'products')->get();
             $orders = Commande::with('customer', 'produits')
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -92,7 +101,6 @@ public function index()
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
 
     public function track($reference)
     {
@@ -126,65 +134,97 @@ public function index()
 
     public function updateStatus(Request $request, string $id)
     {
-        // Valider les données de la requête pour la mise à jour du statut
         $request->validate([
             'statut' => 'required|in:en cours,terminé,annulé',
-
         ]);
 
         try {
-            // Trouver la commande spécifiée
+            $user = auth()->user();
+
+            if ($user->role !== 'vendeur') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Accès refusé. Vous devez être un vendeur pour mettre à jour une commande.'
+                ], 403);
+            }
+
             $order = Commande::with(['produits'])->find($id);
 
-            // Mettre à jour le statut de la commande
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Commande non trouvée.'
+                ], 404);
+            }
+
+            // Vérifier si tous les produits de la commande appartiennent à ce vendeur
+            $produitsDuVendeur = $order->produits->filter(function ($produit) use ($user) {
+                return $produit->user_id === $user->id;
+            });
+
+            // Si aucun produit de la commande n'appartient à ce vendeur
+            if ($produitsDuVendeur->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cette commande ne contient aucun produit de votre boutique.'
+                ], 403);
+            }
+
             $order->statut = $request->input('statut');
 
-            // Si le statut est "completed", mettre à jour les quantités des produits en stock
+            // Si le statut est "terminé", mettre à jour les quantités des produits en stock
             if ($request->input('statut') === 'terminé') {
-                foreach ($order->produits as $product) {
-
-                    // Déduire la quantité commandée du stock
+                foreach ($produitsDuVendeur as $product) {
                     $productInStock = Produit::find($product->id);
 
                     if ($productInStock) {
                         $productInStock->quantite -= $product->pivot->quantiteProduit;
 
-                        // Vérifier que la quantité n'est pas négative
-                        if ($productInStock->quantity < 0) {
-                            return response()->json(['success' => false, 'message' => 'Stock insuffisant pour le produit ' . $product->name], 400);
+                        // Vérifier que la quantité en stock n'est pas négative
+                        if ($productInStock->quantite < 0) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'Stock insuffisant pour le produit ' . $productInStock->libelle
+                            ], 400);
                         }
 
-                        // Sauvegarder la mise à jour
                         $productInStock->save();
                     }
                 }
+
+                // Envoyer un email de confirmation de la commande terminée
                 Mail::to($order->customer->email)->send(new OrderComplete($order));
             }
 
-            // Sauvegarder les modifications de la commande
             $order->save();
 
-            return response()->json(['success' => true, 'message' => 'Order updated successfully.', 'order' => $order]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Statut de la commande mis à jour avec succès.',
+                'order' => $order
+            ], 200);
+
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
+
+
 
     public function cancel(string $id)
 {
     try {
-        // Trouver la commande spécifique
-        $order = Commande::findOrFail($id);
+        $order = Commande::find($id);
 
-        // Vérifier si la commande n'est pas déjà annulée
         if ($order->statut === 'annulé') {
             return response()->json(['success' => false, 'message' => 'Order is already cancelled.']);
         }
 
-        // Mettre à jour le statut de la commande à "annulé"
         $order->statut = 'annulé';
 
-        // Sauvegarder les modifications
         $order->save();
 
         return response()->json(['success' => true, 'message' => 'Order cancelled successfully.']);
@@ -193,46 +233,61 @@ public function index()
     }
 }
 
-public function update(Request $request, string $id)
-{
-    // Valider les données de la requête pour la mise à jour d'une commande
-    $request->validate([
-        'statut' => 'required|in:en cours,terminé,annulé',
-        'montant' => 'nullable|integer',
-        'produits' => 'nullable|array',
-        'produits.*.id' => 'integer|exists:produits,id',
-        'produits.*.quantiteProduit' => 'integer|min:1',
-        'produits.*.prixProduit'=> 'integer'
-    ]);
+    public function update(Request $request, string $id)
+    {
+        $request->validate([
+            'statut' => 'required|in:en cours,terminé,annulé',
+            'produits' => 'required|array',
+            'produits.*.id' => 'integer|exists:produits,id',
+            'produits.*.quantiteProduit' => 'integer|min:1',
+        ]);
 
-    try {
-        // Trouver la commande spécifiée
-        $order = Commande::find($id);
+        try {
 
-        if (!$order) {
-            return response()->json(['success' => false, 'message' => 'Commande non trouvée.'], 404);
-        }
+            $order = Commande::find($id);
 
-        // Mettre à jour les champs de la commande
-        $order->update($request->only(['statut', 'montant']));
-
-        // Si des produits sont passés dans la requête, mettre à jour la relation avec les produits
-        if ($request->has('produits')) {
-            $order->produits()->detach(); // Supprimer les produits actuels
-            foreach ($request->produits as $produit) {
-                $order->produits()->attach($produit['id'], [
-                    'quantiteProduit' => $produit['quantiteProduit'],
-                    'prixProduit' => $produit['prixProduit']
-                ]);
+            if (!$order) {
+                return response()->json(['success' => false, 'message' => 'Commande non trouvée.'], 404);
             }
+
+            if ($order->statut !== 'en cours') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Modification impossible. Seules les commandes avec le statut "en cours" peuvent être modifiées.'
+                ], 403);
+            }
+
+            $order->statut = $request->statut;
+            $montantTotal = 0;
+            $order->produits()->detach();
+            foreach ($request->produits as $produit) {
+                $productInStock = Produit::find($produit['id']);
+                if ($productInStock) {
+                    $order->produits()->attach($produit['id'], [
+                        'quantiteProduit' => $produit['quantiteProduit'],
+                        'prixProduit' => $productInStock->prix,
+                    ]);
+                    $montantTotal += $produit['quantiteProduit'] * $productInStock->prix;
+                }
+            }
+            $order->montant = $montantTotal;
+            $order->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Commande mise à jour avec succès.',
+                'order' => $order
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json(['success' => true, 'message' => 'Commande mise à jour avec succès.', 'order' => $order]);
-
-    } catch (\Exception $e) {
-        return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
     }
-}
+
+
 
 
     public function show(string $id)
@@ -245,4 +300,26 @@ public function update(Request $request, string $id)
             return response()->json(['success' => false, 'message' => $e->getMessage()], 404);
         }
     }
+
+    public function mostOrderedProducts()
+    {
+        try {
+            $user = Auth::user();
+            if ($user->role !== 'vendeur') {
+                return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 403);
+            }
+            // Récupérer les produits les plus commandés dans la boutique du vendeur avec leur catégorie
+            $mostOrderedProducts = Produit::with('categorie')
+                ->where('user_id', $user->id)
+                ->withCount('commandes')
+                ->orderBy('commandes_count', 'desc')
+                ->take(9)
+                ->get();
+
+            return response()->json($mostOrderedProducts);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
 }

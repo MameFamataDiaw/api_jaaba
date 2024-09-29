@@ -34,25 +34,40 @@ class ProduitController extends Controller
     public function store(Request $request)
     {
         $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => "Utilisateur non authentifié.",
+            ], 401);
+        }
+
+        if ($user->role !== 'vendeur') {
+            return response()->json([
+                'status' => false,
+                'message' => "Seuls les utilisateurs avec le rôle vendeur peuvent ajouter des produits.",
+            ], 403);
+        }
+
         try {
             $request->validate(
                 [
-                    'libelle' => 'required|max:20',
-                    'description' => 'required|max:100',
+                    'libelle' => 'required',
+                    'description' => 'required',
                     'prix' => 'required|numeric',
                     'quantite'=> 'required|numeric',
-                    'photo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                    'photo' => 'sometimes|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
                 ]
             );
-            $imageName = time().'.'.$request->photo->extension();
-            $request->photo->move(public_path('images'), $imageName);
 
-//        $product = new Produit();
-//        $product->libelle = $request->libelle;
-//        $product->description = $request->description;
-//        $product->photo = 'images/'.$imageName;
-//        $product->save();
+            // Vérification si la photo existe dans la requête
+            $imageName = null;
+            if ($request->hasFile('photo')) {
+                $imageName = time().'.'.$request->photo->extension();
+                $request->photo->move(public_path('images'), $imageName);
+            }
 
+            // Création du produit
             $produit = Produit::create([
                 'libelle' => $request->libelle,
                 'description' => $request->description,
@@ -65,25 +80,33 @@ class ProduitController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => "Produit cree avec succes !",
+                'message' => "Produit créé avec succès !",
                 'produit' => $produit
-            ],201);
-        }catch (\Exception $e){
-            \Log::error('Erreur lors de l\'ajout du nouveau produit  : '.$e->getMessage());
+            ], 201);
+
+        } catch (\Exception $e) {
+            \Log::error('Erreur lors de l\'ajout du nouveau produit : '.$e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => "Erreur lors de l'ajout du nouveau produit .",
+                'message' => "Erreur lors de l'ajout du nouveau produit.",
                 'error' => $e->getMessage()
             ], 400);
         }
     }
 
+
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show($id)
     {
-        //
+        $product = Produit::find($id);
+
+        if (!$product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        return response()->json($product);
     }
 
     /**
@@ -117,16 +140,6 @@ class ProduitController extends Controller
                 $request->photo->move(public_path('images'), $imageName);
                 $product->photo = $imageName; // Assigner la nouvelle image
             }
-
-//            // Mettre à jour les autres attributs du produit
-//            $product->libelle = $request->libelle;
-//            $product->description = $request->description;
-//            $product->prix = $request->prix;
-//            $product->quantite = $request->quantite;
-//            $product->categorie_id = $request->categorie_id;
-//
-//            // Sauvegarder les changements dans la base de données
-//            $product->save();
 
             $product->update([
                 'libelle' => $request->libelle,
@@ -177,4 +190,24 @@ class ProduitController extends Controller
             return response()->json(['error' => 'Produit non trouve'], 404);
         }
     }
+
+    public function search(Request $request)
+{
+    $query = Produit::query();
+
+    if ($request->has('libelle')) {
+        $query->where('libelle', 'like', '%' . $request->input('libelle') . '%');
+    }
+
+    if ($request->has('categorie_id')) {
+        $query->where('categorie_id', $request->input('categorie_id'));
+    }
+
+    $products = $query->with('categorie')->paginate(10);
+
+    return response()->json($products);
+}
+
+
+
 }

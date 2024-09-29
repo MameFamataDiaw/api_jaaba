@@ -16,7 +16,6 @@ return new class extends Migration
             $table->string('nom',30);
             $table->string('prenom',50);
             $table->string('telephone');
-            $table->string('adresse');
             $table->string('email')->unique();
             $table->string('photo')->nullable();
             $table->enum('role', ['vendeur', 'client', 'livreur', 'admin']);

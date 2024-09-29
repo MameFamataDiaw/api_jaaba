@@ -21,13 +21,18 @@ class User extends Authenticatable
         'nom',
         'prenom',
         'telephone',
-        'adresse',
+        'adresse_id',
         'email',
         'photo',
         'password',
         'role',
         'statut',
     ];
+
+    public function adresse()
+    {
+        return $this->belongsTo(Adresse::class, 'adresse_id');
+    }
 
     public function customer()
 {

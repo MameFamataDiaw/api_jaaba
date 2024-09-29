@@ -29,11 +29,11 @@ class UserFactory extends Factory
             'email' => "admin@mail.com",
             'role' => "admin",
             'telephone' => "77 317 42 70",
-            'adresse' => "in line",
             'statut' => true,
             'email_verified_at' => now(),
             'password' => Hash::make('passer@5'),
             'remember_token' => Str::random(10),
+            'adresse_id' => \App\Models\Adresse::factory()->create()->id,
         ];
     }
 
