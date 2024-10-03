@@ -9,6 +9,7 @@ use App\Models\Produit;
 use App\Models\User;
 use http\Env\Response;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 
 class OrderController extends Controller
@@ -28,6 +29,81 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => $e->getMessage(),
                 ], 500);
+        }
+    }
+
+    /**
+     * Recuperer toutes les commandes d'un client
+     */
+    public function commandesClient()
+    {
+        try {
+            //recuperer l'utilisateur authentifie
+            $user = Auth::user();
+
+            //verifier si c'est un client
+            if ($user->role !== 'client'){
+                return response()->json([
+                    'success' => false,
+                    'message' => "Seuls les clients peuvent voir leurs commandes"
+                ], 403);
+            }
+
+            //Recuperer toutes les commandes de ce client
+            $commandes = Commande::where('user_id', $user->id)->with('produits')->get();
+
+            //Retourner les commandes
+            return response()->json([
+                'success' => true,
+                'client' => $user->nom . ' ' . $user->prenom,
+                'commandes' => $commandes
+            ], 200);
+        }catch (\Exception $e){
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des commandes du client.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Recuperer toutes les commandes contenant les produits du vendeur
+     */
+    public function commandesVendeur()
+    {
+        try {
+            //Recuperer l'utilisateur authentifie
+            $user = Auth::user();
+
+            //Verifier si c'est un vendeur
+            if ($user->role !== 'vendeur') {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Seuls les vendeurs peuvent voir leurs commandes."
+                ], 403);
+            }
+
+            //Recuperer tous les produits du vendeur
+            $produitsVendeur = Produit::where('user_id', $user->id)->pluck('id')->toArray();
+
+            //Recperer toutes les commandes contenant ces produits
+            $commandes = Commande::whereHas('produits', function ($query) use ($produitsVendeur) {
+                $query->whereIn('produit_id', $produitsVendeur);
+            })->with('produits')->get();
+
+            //Retourner les commandes
+            return response()->json([
+                'success' => true,
+                'vendeur' => $user->nom . ' ' . $user->prenom,
+                'commandes' => $commandes
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des commandes du vendeur.',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 

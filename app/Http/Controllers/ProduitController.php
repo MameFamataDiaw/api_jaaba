@@ -77,10 +77,10 @@ class ProduitController extends Controller
             $user = Auth::user();
 
             // Vérifier si l'utilisateur a le rôle "vendeur"
-            if (!$user->hasRole('vendeur')) {
+            if ($user->role !== 'vendeur') {
                 return response()->json([
                     'status' => false,
-                    'message' => "Seuls les vendeurs peuvent ajouter un produit."
+                    'message' => "Seuls les vendeurs peuvent créer une boutique."
                 ], 403);
             }
 
@@ -167,8 +167,8 @@ class ProduitController extends Controller
         try {
             // Récupérer l'utilisateur connecte
             $user = Auth::user();
-            // Vérifier si l'utilisateur a le rôle "vendeur"
-            if (!$user->hasRole('vendeur')) {
+
+            if ($user->role !== 'vendeur') {
                 return response()->json([
                     'status' => false,
                     'message' => "Seuls les vendeurs peuvent créer une boutique."
@@ -242,7 +242,14 @@ class ProduitController extends Controller
 //            Recuperer l'utilisateur connecte
             $user = Auth::user();
             // Vérifier si l'utilisateur a le rôle "vendeur"
-            if (!$user->hasRole('vendeur')) {
+//            if (!$user->hasRole('vendeur')) {
+//                return response()->json([
+//                    'status' => false,
+//                    'message' => "Seuls les vendeurs peuvent créer une boutique."
+//                ], 403);
+//            }
+
+            if ($user->role !== 'vendeur') {
                 return response()->json([
                     'status' => false,
                     'message' => "Seuls les vendeurs peuvent créer une boutique."
